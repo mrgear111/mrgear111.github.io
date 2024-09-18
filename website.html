@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Solar System</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: black; }
+        #threejsContainer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none; /* Initially hidden, shown after video */
+        }
+        #introVideoContainer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: black;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        video {
+            width: 100%;
+            height: auto;
+            object-fit: cover;
+        }
+        #speedControl {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            z-index: 3;
+        }
+        #planetInfo {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 8px;
+            display: none;
+            z-index: 3;
+        }
+    </style>
+</head>
+<body>
+    <!-- Video Intro -->
+    <div id="introVideoContainer">
+        <video id="introVideo" muted>
+            <source src="intro.mov" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+    </div>
+
+    <!-- Three.js container for the solar system -->
+    <div id="threejsContainer"></div>
+
+    <!-- Speed control slider for solar system rotation -->
+    <div id="speedControl">
+        <label for="rotationSpeed">Rotation Speed:</label>
+        <input type="range" id="rotationSpeed" min="0.001" max="0.1" step="0.001" value="0.005">
+        <span id="speedValue">0.005</span>
+    </div>
+
+    <!-- Planet Information Display -->
+    <div id="planetInfo"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        const introVideo = document.getElementById('introVideo');
+        const threejsContainer = document.getElementById('threejsContainer');
+        const introVideoContainer = document.getElementById('introVideoContainer');
+        const planetInfo = document.getElementById('planetInfo');
+        const planets = [];
+        let selectedPlanet = null;
+
+        introVideo.playbackRate = 1.5;
+        introVideo.currentTime = 0;
+        introVideo.play();
+
+        introVideo.addEventListener('timeupdate', () => {
+            if (introVideo.currentTime >= 10) {
+                introVideo.pause();
+                introVideoContainer.style.display = 'none';
+                threejsContainer.style.display = 'block';
+                startSolarSystem();
+            }
+        });
+
+        function startSolarSystem() {
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            threejsContainer.appendChild(renderer.domElement);
+
+            const textureLoader = new THREE.TextureLoader();
+
+            // Lighting
+            const pointLight = new THREE.PointLight(0xffffff, 2);
+            pointLight.position.set(10, 10, 10);
+            scene.add(pointLight);
+
+            // Sun
+            const sunGeometry = new THREE.SphereGeometry(3, 64, 64);
+            const sunMaterial = new THREE.MeshBasicMaterial({
+                map: textureLoader.load('sun.jpg'),
+                emissive: 0xFFFF00,
+                emissiveIntensity: 1
+            });
+            const sun = new THREE.Mesh(sunGeometry, sunMaterial);
+            scene.add(sun);
+
+            const planetData = [
+                { name: 'Mercury', size: 0.5, distance: 6, texture: 'mercury.jpg', details: 'Closest planet to the Sun.' },
+                { name: 'Venus', size: 1, distance: 8, texture: 'venus.jpg', details: 'Second planet from the Sun.' },
+                { name: 'Earth', size: 1.2, distance: 10, texture: 'earth.jpg', details: 'Our home planet.' },
+                { name: 'Mars', size: 0.8, distance: 12, texture: 'mars.jpg', details: 'Known as the red planet.' },
+                { name: 'Jupiter', size: 2.5, distance: 16, texture: 'jupiter.jpg', details: 'Largest planet in the solar system.' },
+                { name: 'Saturn', size: 2, distance: 20, texture: 'saturn.jpg', details: 'Famous for its rings.' },
+                { name: 'Uranus', size: 1.8, distance: 24, texture: 'uranus.jpg', details: 'Has a unique tilt.' },
+                { name: 'Neptune', size: 1.7, distance: 28, texture: 'neptune.jpg', details: 'Farthest planet from the Sun.' }
+            ];
+
+            planetData.forEach(data => {
+                const planetGeometry = new THREE.SphereGeometry(data.size, 64, 64);
+                const planetMaterial = new THREE.MeshStandardMaterial({
+                    map: textureLoader.load(data.texture)
+                });
+                const planet = new THREE.Mesh(planetGeometry, planetMaterial);
+                planet.position.set(data.distance, 0, 0);
+                planet.orbitRadius = data.distance;
+                planet.orbitSpeed = Math.random() * 0.02 + 0.01;
+                planet.userData = { name: data.name, details: data.details };
+                planets.push(planet);
+                scene.add(planet);
+            });
+
+            camera.position.z = 50;
+
+            const controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enabled = false; // Only enable on planet zoom
+
+            // Animate the solar system
+            function animate() {
+                requestAnimationFrame(animate);
+
+                sun.rotation.y += 0.002;
+
+                planets.forEach(planet => {
+                    planet.position.x = planet.orbitRadius * Math.cos(Date.now() * planet.orbitSpeed * 0.001);
+                    planet.position.z = planet.orbitRadius * Math.sin(Date.now() * planet.orbitSpeed * 0.001);
+                    planet.rotation.y += 0.01;
+                });
+
+                renderer.render(scene, camera);
+            }
+            animate();
+
+            // Resize handler
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            // Speed control for planet rotation
+            document.getElementById('rotationSpeed').addEventListener('input', (event) => {
+                const speedValue = parseFloat(event.target.value);
+                planets.forEach(planet => planet.orbitSpeed = speedValue);
+                document.getElementById('speedValue').textContent = speedValue.toFixed(3);
+            });
+
+            // Zoom and show details on planet click
+            window.addEventListener('click', (event) => {
+                const mouse = new THREE.Vector2(
+                    (event.clientX / window.innerWidth) * 2 - 1,
+                    -(event.clientY / window.innerHeight) * 2 + 1
+                );
+                const raycaster = new THREE.Raycaster();
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(planets);
+
+                if (intersects.length > 0) {
+                    selectedPlanet = intersects[0].object;
+                    zoomIntoPlanet(selectedPlanet);
+                }
+            });
+
+            function zoomIntoPlanet(planet) {
+                controls.enabled = true;
+                planetInfo.style.display = 'block';
+                planetInfo.innerHTML = `<h2>${planet.userData.name}</h2><p>${planet.userData.details}</p>`;
+
+                const targetPosition = planet.position.clone().multiplyScalar(1.5);
+                const zoomDuration = 1000;
+
+                new TWEEN.Tween(camera.position)
+                    .to({ x: targetPosition.x, y: targetPosition.y, z: targetPosition.z + 2 }, zoomDuration)
+                    .easing(TWEEN.Easing.Quadratic.Out)
+                    .start();
+
+                controls.target.copy(planet.position);
+                controls.update();
+            }
+        }
+    </script>
+</body>
+</html>
